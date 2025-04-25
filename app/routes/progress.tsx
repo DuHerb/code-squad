@@ -1,10 +1,10 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
-import { createServerFn, type ServerFnCtx } from '@tanstack/react-start';
+import { createServerFn } from '@tanstack/react-start';
 import {
-  getAllProgress,
   handleClearUserProgress,
   handleClearAllProgress,
 } from '../server/progress';
+import { progressRepository } from '../server/repositories/progress.repository';
 
 // Server function to clear a specific user's progress
 const clearUserProgressServer = createServerFn({ method: 'POST' })
@@ -23,16 +23,31 @@ const clearAllProgressServer = createServerFn({ method: 'POST' })
     return await handleClearAllProgress();
   });
 
+// Server Function to Log Progress
+const logProgressServer = createServerFn({ method: 'POST' }).handler(
+  async () => {
+    console.log('[Manual Log Button] Logging current server progress...');
+    // Use repository directly (safe now)
+    const progressMap = await progressRepository.getAllProgress();
+    console.log('[Manual Log Button] Current progressMap:', progressMap);
+    return { success: true, userCount: progressMap.size };
+  }
+);
+
 export const Route = createFileRoute('/progress')({
   loader: async () => {
-    console.log('Loading progress data...');
-    const progressMap = getAllProgress();
+    console.log('Loading progress data (Direct Repo Call)...');
+    // Use repository directly
+    const progressMap = await progressRepository.getAllProgress();
+    console.log('[Progress Loader] Fetched progressMap:', progressMap);
+
     const progressData = Array.from(progressMap.entries()).map(
       ([userId, completedSet]) => ({
         userId,
         completedChallenges: Array.from(completedSet),
       })
     );
+    console.log('[Progress Loader] Mapped progressData:', progressData);
     return { progressData };
   },
   component: ProgressDashboard,
@@ -41,6 +56,11 @@ export const Route = createFileRoute('/progress')({
 function ProgressDashboard() {
   const { progressData } = Route.useLoaderData();
   const router = useRouter(); // For invalidating data
+
+  console.log(
+    '[ProgressDashboard Component] Received progressData:',
+    progressData
+  );
 
   const handleClearUser = async (userId: string) => {
     if (
@@ -72,9 +92,34 @@ function ProgressDashboard() {
     }
   };
 
+  // --- New Handler for Logging ---
+  const handleLogProgress = async () => {
+    try {
+      console.log('Sending request to log server progress...');
+      // @ts-ignore - Ignoring potential type mismatch for call
+      const result = await logProgressServer({ data: {} }); // Send empty data for POST
+      console.log('Server log response:', result);
+      alert(`Server progress logged. User count: ${result.userCount}`);
+    } catch (error) {
+      console.error('Failed to trigger server log:', error);
+      alert('Failed to trigger server log.');
+    }
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       <h1>User Progress Dashboard</h1>
+      <button
+        onClick={handleLogProgress}
+        style={{
+          marginBottom: '20px',
+          marginLeft: '10px',
+          backgroundColor: '#e0e0ff',
+          border: '1px solid blue',
+        }}
+      >
+        Log Server Progress Map (Console)
+      </button>
       <button
         onClick={handleClearAll}
         style={{

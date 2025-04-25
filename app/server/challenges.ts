@@ -1,94 +1,54 @@
-import { markCurrentUserChallengeCompleted } from './progress'; // Need progress marker
-
-export interface TestCase {
-  input: any[]; // Arguments to pass to the function
-  expectedOutput: any; // Expected return value
-}
-
-export interface Challenge {
-  id: string;
-  name: string;
-  description: string;
-  difficulty: number; // Added difficulty
-  functionName: string; // The function the user needs to fix/implement
-  initialCode: string;
-  testCases: TestCase[];
-}
-
-// --- New Execution Result Types ---
-
+// Keep types needed for execution result
 export interface TestCaseResult {
   input: any[];
-  output: any; // Actual output from user code
+  output: any;
   expected: any;
   passed: boolean;
-  error?: string; // Optional error message if test case failed to run
+  error?: string;
 }
 
 export type ChallengeExecutionResult =
   | {
-      success: true; // Code compiled and ran for all test cases
-      allPassed: boolean; // Did all test cases produce the correct output?
-      results: TestCaseResult[]; // Results for each test case
+      success: true;
+      allPassed: boolean;
+      results: TestCaseResult[];
     }
   | {
-      success: false; // Code failed to compile or had critical runtime error
+      success: false;
       error: string;
     };
 
-// Simple in-memory store for challenges
-const challenges: Challenge[] = [
-  {
-    id: 'hello-world-typo',
-    name: 'Hello World Typo',
-    description: 'Fix the typo in the return statement.',
-    difficulty: 1, // Assign difficulty
-    functionName: 'greet',
-    initialCode: `function greet(name) {\n  // Fix the typo!\n  retun \'Hello, \' + name + \'!';\n}`,
-    testCases: [
-      { input: ['World'], expectedOutput: 'Hello, World!' },
-      { input: ['Code Squad'], expectedOutput: 'Hello, Code Squad!' },
-    ],
-  },
-  {
-    id: 'simple-add',
-    name: 'Simple Addition',
-    description: 'Implement a function that adds two numbers.',
-    difficulty: 1, // Assign difficulty
-    functionName: 'add',
-    initialCode: `function add(a, b) {\n  // Return the sum of a and b\n  return undefined; // Placeholder\n}`,
-    testCases: [
-      { input: [1, 2], expectedOutput: 3 },
-      { input: [10, -5], expectedOutput: 5 },
-      { input: [0, 0], expectedOutput: 0 },
-    ],
-  },
-  // Add more challenges here later
-];
+// --- Remove old types (Challenge, TestCase - moved to challenges.repository.ts) ---
+// export interface TestCase { ... }
+// export interface Challenge { ... }
 
-// Function to get all challenges (sorted by difficulty)
-export function getAllChallenges(): Challenge[] {
-  // Return a copy sorted by difficulty
-  return [...challenges].sort((a, b) => a.difficulty - b.difficulty);
-}
+// --- Remove old data and data access functions ---
+// const challenges: Challenge[] = [ ... ];
+// export function getAllChallenges(): Challenge[] { ... }
+// export function getChallengeById(id: string): Challenge | undefined { ... }
 
-// Server function to get all challenge definitions (or maybe just IDs/names later)
-// For now, let's just get a specific challenge by ID
-export function getChallengeById(id: string): Challenge | undefined {
-  return challenges.find((c) => c.id === id);
-}
+// Import the repositories and necessary types
+import {
+  challengeRepository,
+  type Challenge,
+} from './repositories/challenges.repository';
+// Use the repository again
+// import { progressRepository } from './repositories/progress.repository';
+import ivm from 'isolated-vm'; // Keep ivm import here for now
 
-// --- New Core Execution Handler ---
+// --- Core Execution Handler (handleExecuteChallenge) ---
+// Keep this function, but update it to use repositories
 
 export async function handleExecuteChallenge(data: {
   challengeId: string;
   userCode: string;
 }): Promise<ChallengeExecutionResult> {
-  // Import ivm dynamically
-  const ivm = (await import('isolated-vm')).default;
+  // Import ivm dynamically ONLY if we decide to keep it here
+  // const ivm = (await import('isolated-vm')).default;
 
   const { challengeId, userCode } = data;
-  const challenge = getChallengeById(challengeId);
+  // Use repository to get challenge
+  const challenge = await challengeRepository.getChallengeById(challengeId);
 
   if (!challenge) {
     return {
@@ -104,10 +64,10 @@ export async function handleExecuteChallenge(data: {
   }
 
   const testCaseResults: TestCaseResult[] = [];
-  let overallSuccess = true;
+  // Remove overallSuccess variable, rely on try/catch
 
   try {
-    // Use 'any' type for isolate and context
+    // Compilation check (keep for now)
     let compileIsolate: any | null = new ivm.Isolate({ memoryLimit: 8 });
     try {
       await compileIsolate.compileScript(userCode);
@@ -173,19 +133,21 @@ export async function handleExecuteChallenge(data: {
         passed: passed,
         error: testError,
       });
-    } // End loop through test cases
+    } // End loop
+
+    // If we reach here, execution succeeded, now check test results
+    const allPassed = testCaseResults.every((r) => r.passed);
+
+    // Return results, let client handle marking completion
+    return {
+      success: true,
+      allPassed: allPassed,
+      results: testCaseResults,
+    };
   } catch (setupError: any) {
+    // Catch errors during the setup/compilation phase if they weren't caught earlier
     console.error(`[${challengeId}] Setup/General Error:`, setupError);
+    // Ensure the return type matches ChallengeExecutionResult
     return { success: false, error: setupError.message || String(setupError) };
   }
-
-  const allPassed = testCaseResults.every((r) => r.passed);
-  if (allPassed) {
-    markCurrentUserChallengeCompleted(challengeId);
-  }
-  return {
-    success: true,
-    allPassed: allPassed,
-    results: testCaseResults,
-  };
 }

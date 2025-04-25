@@ -1,15 +1,17 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { useState, useEffect } from 'react';
+import { CodeEditor } from '../components/CodeEditor';
 import {
-  getAllChallenges,
-  getChallengeById,
-  type Challenge,
   handleExecuteChallenge,
   type ChallengeExecutionResult,
 } from '../server/challenges';
-import { getCurrentUserCompletedChallenges } from '../server/progress';
-import { CodeEditor } from '../components/CodeEditor';
+import { challengeRepository } from '../server/repositories/challenges.repository';
+import { progressRepository } from '../server/repositories/progress.repository';
+import {
+  markChallengeCompletedServerFn,
+  getCompletedChallengesServerFn,
+} from '../server/progress.server';
 
 // Simplified server function - Calls the core logic handler
 const executeCode = createServerFn({ method: 'POST' })
@@ -22,11 +24,32 @@ const executeCode = createServerFn({ method: 'POST' })
 // Route definition with Loader
 export const Route = createFileRoute('/')({
   loader: async () => {
-    console.log('Loader: Finding next challenge for user1...');
-    const allChallenges = getAllChallenges();
-    const completedSet = getCurrentUserCompletedChallenges();
-    console.log('Loader: Completed challenges:', completedSet);
+    console.log('Loader: Finding next challenge for user1 via ServerFn...');
+    const allChallenges = await challengeRepository.getAllChallenges();
+
+    // Call server function with no arguments
+    let completedArray: string[] = [];
+    try {
+      // No argument needed, no suppression needed
+      completedArray = await getCompletedChallengesServerFn();
+    } catch (error) {
+      console.error('Error fetching completed challenges:', error);
+      completedArray = [];
+    }
+    const completedSet = new Set(completedArray);
+
+    console.log(
+      '[Index Loader] Fetched completedSet (via ServerFn):',
+      completedArray
+    );
+
     const nextChallenge = allChallenges.find((c) => !completedSet.has(c.id));
+
+    console.log(
+      '[Index Loader] Found next challenge:',
+      nextChallenge?.id ?? 'None'
+    );
+
     if (!nextChallenge) {
       console.log(
         'Loader: All challenges completed! Reloading first challenge.'
@@ -90,15 +113,29 @@ function HomeComponent() {
     setIsLoading(true);
     setExecutionResult(null);
     try {
+      // 1. Execute the code via server function
       const result = await executeCode({
-        // @ts-ignore - Ignoring persistent type mismatch for createServerFn call
+        // @ts-ignore - Ignoring persistent type mismatch
         data: { challengeId: challenge.id, userCode: code },
       });
+
       setExecutionResult(result as ChallengeExecutionResult);
 
+      // 2. If execution successful and all tests passed, mark complete and invalidate
       if (result.success && result.allPassed) {
-        console.log('Challenge passed! Invalidating route...');
-        router.invalidate();
+        console.log('Challenge passed! Marking complete and invalidating...');
+        try {
+          await markChallengeCompletedServerFn(
+            // @ts-expect-error - Known type issue calling serverFn from client
+            { data: { userId: 'user1', challengeId: challenge.id } }
+          );
+          console.log('Marked complete via server fn call from client.');
+
+          await router.invalidate();
+          console.log('Route invalidated.');
+        } catch (markError) {
+          console.error('Error marking challenge completed:', markError);
+        }
       }
     } catch (error) {
       console.error('Error calling executeCode:', error);
