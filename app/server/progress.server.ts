@@ -8,6 +8,26 @@ import { progressRepository } from './repositories/progress.repository';
 
 // Removed getAllProgressServerFn and getCompletedChallengesServerFn
 
+// --- Server Function for Getting All Progress ---
+// Needed for the /progress route loader when running client-side
+export const getAllProgressServerFn = createServerFn({
+  method: 'GET',
+}).handler(async (/* ctx: any - not needed */) => {
+  console.log('[ServerFn] Getting all progress (In-Memory)...');
+  // Call the repository (safe now)
+  const allProgress = await progressRepository.getAllProgress();
+  // Convert Map<string, Set<string>> to Record<string, string[]>
+  const serializableProgress: Record<string, string[]> = {};
+  for (const [userId, completedSet] of allProgress.entries()) {
+    serializableProgress[userId] = Array.from(completedSet);
+  }
+  console.log(
+    '[ServerFn] Returning serializable progress:',
+    serializableProgress
+  );
+  return serializableProgress;
+});
+
 // --- Server Function for Getting Completed Challenges ---
 // No longer needs input argument
 

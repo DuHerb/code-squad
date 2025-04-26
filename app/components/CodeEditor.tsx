@@ -14,7 +14,7 @@ export function CodeEditor({
 }: Readonly<CodeEditorProps>) {
   return (
     <Editor
-      height='500px' // Default height, can be customized via props later
+      height='300px' // Default height, can be customized via props later
       defaultLanguage={language}
       defaultValue={initialCode}
       onChange={onChange}

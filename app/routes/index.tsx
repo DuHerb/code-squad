@@ -148,16 +148,15 @@ function HomeComponent() {
     }
   };
 
-  // JSX for the component - Needs update for detailed results display
+  // JSX for the component
   return (
-    <div style={{ padding: '20px' }}>
+    // Add container class for overall padding and centering
+    <div className='container'>
       {challenge.allComplete && (
+        // Add specific class for the completion banner
         <div
-          style={{
-            border: '2px solid blue',
-            padding: '10px',
-            marginBottom: '15px',
-          }}
+          className='all-complete-banner'
+          // style={{ border: '2px solid blue', padding: '10px', marginBottom: '15px'}} // Remove inline style
         >
           🎉 You've completed all challenges! 🎉
         </div>
@@ -167,7 +166,7 @@ function HomeComponent() {
       </h1>
       <p>{challenge.description}</p>
 
-      {/* Conditionally render CodeEditor (NO Suspense/Lazy) */}
+      {/* Code Editor Area */}
       {isClient ? (
         <CodeEditor
           key={challenge.id}
@@ -176,8 +175,8 @@ function HomeComponent() {
           onChange={handleCodeChange}
         />
       ) : (
-        // Placeholder during SSR / initial client render before mount
         <div
+          className='loading-editor'
           style={{
             height: '500px',
             border: '1px dashed #ccc',
@@ -191,59 +190,74 @@ function HomeComponent() {
         </div>
       )}
 
+      {/* Apply button style */}
       <button
+        className='button-run' // Add class
         onClick={handleRunCode}
-        disabled={isLoading || challenge.allComplete || !isClient} // Keep button disabled until client render
-        style={{ marginTop: '10px' }}
+        disabled={isLoading || challenge.allComplete || !isClient}
+        // style={{ marginTop: '10px' }} // Remove inline style
       >
         {isLoading ? 'Running...' : 'Run Test Cases'}
       </button>
 
       {executionResult && (
+        // Add base class and dynamic class for border color
         <div
-          style={{
-            marginTop: '20px',
-            border: `2px solid ${executionResult.success ? (executionResult.allPassed ? 'green' : 'orange') : 'red'}`,
-            padding: '10px',
-          }}
+          className={`results-container ${
+            !executionResult.success
+              ? 'results-fail'
+              : executionResult.allPassed
+                ? 'results-success'
+                : 'results-partial'
+          }`}
+          // style={...} // Remove inline style for border
         >
           <h3>Execution Result:</h3>
           {!executionResult.success ? (
-            <pre style={{ color: 'red' }}>Error: {executionResult.error}</pre>
+            // Add class for error text
+            <pre className='test-status-error'>
+              Error: {executionResult.error}
+            </pre>
           ) : (
-            // Display individual test case results
             <div>
+              {/* Add classes for overall status */}
               <h4
-                style={{
-                  color: executionResult.allPassed ? 'green' : 'orange',
-                }}
+                className={
+                  executionResult.allPassed
+                    ? 'test-status-passed'
+                    : 'test-status-failed'
+                }
+                // style={...} // Remove inline style
               >
                 Overall: {executionResult.allPassed ? 'PASSED' : 'FAILED'}
               </h4>
               <ul>
                 {executionResult.results.map((res, index) => (
+                  // Apply dynamic class based on test status
                   <li
                     key={index}
-                    style={{
-                      borderBottom: '1px dashed #eee',
-                      paddingBottom: '5px',
-                      marginBottom: '5px',
-                      color: res.passed
-                        ? 'green'
-                        : res.error
-                          ? 'red'
-                          : 'orange',
-                    }}
+                    // style={...} // Remove inline styles
                   >
                     Input: {JSON.stringify(res.input)} <br />
                     Expected: {JSON.stringify(res.expected)} <br />
                     Output: {JSON.stringify(res.output)} <br />
-                    Status:{' '}
-                    {res.passed
-                      ? 'Passed'
-                      : res.error
-                        ? `Error: ${res.error}`
-                        : 'Failed'}
+                    {/* Apply dynamic class for status text */}
+                    <span
+                      className={
+                        res.passed
+                          ? 'test-status-passed'
+                          : res.error
+                            ? 'test-status-error'
+                            : 'test-status-failed'
+                      }
+                    >
+                      Status:{' '}
+                      {res.passed
+                        ? 'Passed'
+                        : res.error
+                          ? `Error: ${res.error}`
+                          : 'Failed'}
+                    </span>
                   </li>
                 ))}
               </ul>

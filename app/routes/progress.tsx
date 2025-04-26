@@ -4,6 +4,7 @@ import {
   handleClearUserProgress,
   handleClearAllProgress,
 } from '../server/progress';
+import { getAllProgressServerFn } from '../server/progress.server';
 import { progressRepository } from '../server/repositories/progress.repository';
 
 // Server function to clear a specific user's progress
@@ -36,15 +37,19 @@ const logProgressServer = createServerFn({ method: 'POST' }).handler(
 
 export const Route = createFileRoute('/progress')({
   loader: async () => {
-    console.log('Loading progress data (Direct Repo Call)...');
-    // Use repository directly
-    const progressMap = await progressRepository.getAllProgress();
-    console.log('[Progress Loader] Fetched progressMap:', progressMap);
+    console.log('Loading progress data via ServerFn...');
+    // Call the server function
+    const serializableProgress = await getAllProgressServerFn();
+    console.log(
+      '[Progress Loader] Fetched serializableProgress:',
+      serializableProgress
+    );
 
-    const progressData = Array.from(progressMap.entries()).map(
-      ([userId, completedSet]) => ({
+    // Data is already in the desired format Record<string, string[]>
+    const progressData = Object.entries(serializableProgress).map(
+      ([userId, completedChallenges]) => ({
         userId,
-        completedChallenges: Array.from(completedSet),
+        completedChallenges,
       })
     );
     console.log('[Progress Loader] Mapped progressData:', progressData);
@@ -107,40 +112,18 @@ function ProgressDashboard() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div className='container'>
       <h1>User Progress Dashboard</h1>
-      <button
-        onClick={handleLogProgress}
-        style={{
-          marginBottom: '20px',
-          marginLeft: '10px',
-          backgroundColor: '#e0e0ff',
-          border: '1px solid blue',
-        }}
-      >
+      <button className='button-log' onClick={handleLogProgress}>
         Log Server Progress Map (Console)
       </button>
-      <button
-        onClick={handleClearAll}
-        style={{
-          marginBottom: '20px',
-          backgroundColor: '#ffdddd',
-          border: '1px solid red',
-        }}
-      >
+      <button className='button-clear' onClick={handleClearAll}>
         Clear All Progress
       </button>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+      <div className='progress-dashboard'>
         {progressData.length === 0 && <p>No user progress recorded yet.</p>}
         {progressData.map(({ userId, completedChallenges }) => (
-          <div
-            key={userId}
-            style={{
-              border: '1px solid #ccc',
-              padding: '15px',
-              minWidth: '200px',
-            }}
-          >
+          <div key={userId} className='progress-card'>
             <h2>User: {userId}</h2>
             <p>Completed ({completedChallenges.length}):</p>
             {completedChallenges.length > 0 ? (
@@ -153,12 +136,8 @@ function ProgressDashboard() {
               <p>None</p>
             )}
             <button
+              className='button-clear-user'
               onClick={() => handleClearUser(userId)}
-              style={{
-                marginTop: '10px',
-                backgroundColor: '#ffeeee',
-                border: '1px solid orange',
-              }}
             >
               Clear This User's Progress
             </button>
