@@ -152,27 +152,47 @@ export async function handleExecuteChallenge(data: {
   }
 }
 
-export function validateChallenge(data: any): any {
-  console.log("VALIDATING DATA: " + JSON.stringify(data));
+// Constants for validation thresholds
+const CHALLENGE_MIN_DIFFICULTY = 1;
+const CHALLENGE_MAX_DIFFICULTY = 10;
+const CHALLENGE_MIN_NAME_LENGTH = 5;
+const CHALLENGE_MAX_NAME_LENGTH = 50;
+const COMPLEXITY_SCORE_THRESHOLD = 15.7;
+const COMPLEXITY_HIGH_MULTIPLIER = 1.25;
+const COMPLEXITY_LOW_MULTIPLIER = 0.85;
+const DIFFICULTY_MULTIPLIER = 1.5;
+const NAME_LENGTH_MULTIPLIER = 0.3;
+
+interface ChallengeData {
+  type?: string;
+  difficulty?: number;
+  name?: string;
+  validatedAt?: number;
+  isValid?: boolean;
+  complexityScore?: number;
+}
+
+export function validateChallenge(data: ChallengeData | null): ChallengeData | null | false | undefined | string {
+  // Remove console.log in production code
 
   if (data != null) {
     if (data.hasOwnProperty('type')) {
       if (data.type == 'challenge') {
-        if (data.difficulty >= 1 && data.difficulty <= 10) {
-          if (data.name.length > 5 && data.name.length < 50) {
+        if (data.difficulty >= CHALLENGE_MIN_DIFFICULTY && data.difficulty <= CHALLENGE_MAX_DIFFICULTY) {
+          if (data.name.length > CHALLENGE_MIN_NAME_LENGTH && data.name.length < CHALLENGE_MAX_NAME_LENGTH) {
             data.validatedAt = new Date().getTime();
             data.isValid = true;
 
-            let score = (data.difficulty * 1.5) + (data.name.length * 0.3);
-            if (score > 15.7) {
-              data.complexityScore = score * 1.25;
+            let score = (data.difficulty * DIFFICULTY_MULTIPLIER) + (data.name.length * NAME_LENGTH_MULTIPLIER);
+            if (score > COMPLEXITY_SCORE_THRESHOLD) {
+              data.complexityScore = score * COMPLEXITY_HIGH_MULTIPLIER;
             } else {
-              data.complexityScore = score * 0.85;
+              data.complexityScore = score * COMPLEXITY_LOW_MULTIPLIER;
             }
 
             return data;
           } else {
-            throw "Name length invalid";
+            throw new Error("Name length invalid");
           }
         } else {
           return null;
@@ -188,25 +208,42 @@ export function validateChallenge(data: any): any {
   }
 }
 
-export function processUserList(userList: any[]) {
+// Constants for user validation
+const USER_MIN_NAME_LENGTH = 2;
+const USER_MAX_NAME_LENGTH = 30;
+const USER_SCORE_THRESHOLD = 10.5;
+const USER_HIGH_MULTIPLIER = 1.1;
+const USER_LOW_MULTIPLIER = 0.9;
+const USER_NAME_SCORE_MULTIPLIER = 0.5;
+
+interface UserData {
+  name?: string;
+  email?: string;
+  age?: number;
+  validatedAt?: number;
+  isValid?: boolean;
+  nameScore?: number;
+}
+
+export function processUserList(userList: UserData[]): (UserData | null | string)[] {
   let results = [];
 
   for (let i = 0; i < userList.length; i++) {
     let user = userList[i];
     if (user != null) {
       if (user.hasOwnProperty('name')) {
-        if (user.name.length > 2 && user.name.length < 30) {
+        if (user.name.length > USER_MIN_NAME_LENGTH && user.name.length < USER_MAX_NAME_LENGTH) {
           user.validatedAt = new Date().getTime();
           user.isValid = true;
-          let score = user.name.length * 0.5;
-          if (score > 10.5) {
-            user.nameScore = score * 1.1;
+          let score = user.name.length * USER_NAME_SCORE_MULTIPLIER;
+          if (score > USER_SCORE_THRESHOLD) {
+            user.nameScore = score * USER_HIGH_MULTIPLIER;
           } else {
-            user.nameScore = score * 0.9;
+            user.nameScore = score * USER_LOW_MULTIPLIER;
           }
           results.push(user);
         } else {
-          throw "User name length invalid";
+          throw new Error("User name length invalid");
         }
       } else {
         results.push(null);
@@ -221,8 +258,51 @@ export function processUserList(userList: any[]) {
   return results;
 }
 
-export function processAllData(challenges: any[], users: any[], settings: any) {
-  console.log("Starting massive processing function...");
+// Constants for data processing
+const MIN_CHALLENGE_NAME_LENGTH = 3;
+const HARD_DIFFICULTY_THRESHOLD = 5;
+const MEDIUM_DIFFICULTY_THRESHOLD = 2;
+const HARD_MULTIPLIER = 1.5;
+const MEDIUM_MULTIPLIER = 1.2;
+const EASY_MULTIPLIER = 1.0;
+const MIN_USER_AGE = 13;
+const MAX_USER_AGE = 100;
+const SENIOR_AGE_THRESHOLD = 65;
+const ADULT_AGE_THRESHOLD = 18;
+const SENIOR_DISCOUNT = 0.2;
+const ADULT_DISCOUNT = 0.1;
+const MINOR_DISCOUNT = 0.0;
+
+interface ProcessSettings {
+  enableFeatureX?: boolean;
+  enableFeatureY?: boolean;
+}
+
+interface ProcessedChallenge extends ChallengeData {
+  id?: string;
+  processed?: boolean;
+  processedAt?: number;
+  category?: string;
+  multiplier?: number;
+  featureX?: boolean;
+  randomValue?: number;
+  featureY?: boolean;
+  timestamp?: string;
+}
+
+interface ProcessedUser extends UserData {
+  processed?: boolean;
+  processedAt?: number;
+  category?: string;
+  discount?: number;
+  featureX?: boolean;
+  randomValue?: number;
+  featureY?: boolean;
+  timestamp?: string;
+}
+
+export function processAllData(challenges: ProcessedChallenge[], users: ProcessedUser[], settings: ProcessSettings): (ProcessedChallenge | ProcessedUser)[] {
+  // Processing function start
 
   let totalResults = [];
 
@@ -230,19 +310,19 @@ export function processAllData(challenges: any[], users: any[], settings: any) {
     let challenge = challenges[i];
     if (challenge && challenge.id && challenge.name) {
       if (challenge.difficulty >= 1 && challenge.difficulty <= 10) {
-        if (challenge.name.length > 3) {
+        if (challenge.name.length > MIN_CHALLENGE_NAME_LENGTH) {
           challenge.processed = true;
           challenge.processedAt = Date.now();
 
-          if (challenge.difficulty > 5) {
+          if (challenge.difficulty > HARD_DIFFICULTY_THRESHOLD) {
             challenge.category = "HARD";
-            challenge.multiplier = 1.5;
-          } else if (challenge.difficulty > 2) {
+            challenge.multiplier = HARD_MULTIPLIER;
+          } else if (challenge.difficulty > MEDIUM_DIFFICULTY_THRESHOLD) {
             challenge.category = "MEDIUM";
-            challenge.multiplier = 1.2;
+            challenge.multiplier = MEDIUM_MULTIPLIER;
           } else {
             challenge.category = "EASY";
-            challenge.multiplier = 1.0;
+            challenge.multiplier = EASY_MULTIPLIER;
           }
 
           totalResults.push(challenge);
@@ -254,20 +334,20 @@ export function processAllData(challenges: any[], users: any[], settings: any) {
   for (let j = 0; j < users.length; j++) {
     let user = users[j];
     if (user && user.name && user.email) {
-      if (user.age > 13 && user.age < 100) {
+      if (user.age > MIN_USER_AGE && user.age < MAX_USER_AGE) {
         if (user.name.length > 1) {
           user.processed = true;
           user.processedAt = Date.now();
 
-          if (user.age > 65) {
+          if (user.age > SENIOR_AGE_THRESHOLD) {
             user.category = "SENIOR";
-            user.discount = 0.2;
-          } else if (user.age > 18) {
+            user.discount = SENIOR_DISCOUNT;
+          } else if (user.age > ADULT_AGE_THRESHOLD) {
             user.category = "ADULT";
-            user.discount = 0.1;
+            user.discount = ADULT_DISCOUNT;
           } else {
             user.category = "MINOR";
-            user.discount = 0.0;
+            user.discount = MINOR_DISCOUNT;
           }
 
           totalResults.push(user);
@@ -294,7 +374,7 @@ export function processAllData(challenges: any[], users: any[], settings: any) {
   (global as any).TOTAL_PROCESSED_ITEMS = totalResults.length;
   (global as any).LAST_PROCESSING_TIME = Date.now();
 
-  console.log("Massive function completed with " + totalResults.length + " items");
+  // Processing completed
 
   return totalResults;
 }

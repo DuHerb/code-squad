@@ -41,7 +41,7 @@ export class TerribleCodeService {
 
               return data;
             } else {
-              throw "Score too low"; // Violation 11: Throwing string instead of Error
+              throw new Error("Score too low"); // Fixed: Now throwing Error object
             }
           } else {
             return null; // Violation 12: Inconsistent return types
@@ -89,7 +89,7 @@ export class TerribleCodeService {
 
               return data;
             } else {
-              throw "Admin score too low";
+              throw new Error("Admin score too low");
             }
           } else {
             return null;
