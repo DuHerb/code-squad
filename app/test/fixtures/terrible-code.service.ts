@@ -1,4 +1,15 @@
-// This is intentionally bad code for testing automated review
+/**
+ * TEST FIXTURE - INTENTIONALLY BAD CODE
+ *
+ * This file contains intentionally poor code patterns for testing
+ * automated code review tools and training purposes.
+ *
+ * DO NOT USE THIS CODE IN PRODUCTION!
+ *
+ * This file demonstrates various anti-patterns and code violations.
+ */
+
+// @ts-nocheck - Intentionally bad code for testing purposes
 export class TerribleCodeService {
   // Violation 1: Magic numbers everywhere
   // Violation 2: Overly complex function doing too many things

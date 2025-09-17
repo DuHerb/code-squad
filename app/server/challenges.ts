@@ -172,40 +172,43 @@ interface ChallengeData {
   complexityScore?: number;
 }
 
-export function validateChallenge(data: ChallengeData | null): ChallengeData | null | false | undefined | string {
-  // Remove console.log in production code
+// Result type for validation
+type ValidationResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string };
 
-  if (data != null) {
-    if (data.hasOwnProperty('type')) {
-      if (data.type == 'challenge') {
-        if (data.difficulty >= CHALLENGE_MIN_DIFFICULTY && data.difficulty <= CHALLENGE_MAX_DIFFICULTY) {
-          if (data.name.length > CHALLENGE_MIN_NAME_LENGTH && data.name.length < CHALLENGE_MAX_NAME_LENGTH) {
-            data.validatedAt = new Date().getTime();
-            data.isValid = true;
-
-            let score = (data.difficulty * DIFFICULTY_MULTIPLIER) + (data.name.length * NAME_LENGTH_MULTIPLIER);
-            if (score > COMPLEXITY_SCORE_THRESHOLD) {
-              data.complexityScore = score * COMPLEXITY_HIGH_MULTIPLIER;
-            } else {
-              data.complexityScore = score * COMPLEXITY_LOW_MULTIPLIER;
-            }
-
-            return data;
-          } else {
-            throw new Error("Name length invalid");
-          }
-        } else {
-          return null;
-        }
-      } else {
-        return false;
-      }
-    } else {
-      return undefined;
-    }
-  } else {
-    return "ERROR_NULL_DATA";
+export function validateChallenge(data: ChallengeData | null): ValidationResult<ChallengeData> {
+  // Early returns for cleaner code flow
+  if (!data) {
+    return { success: false, error: "ERROR_NULL_DATA" };
   }
+
+  if (!data.hasOwnProperty('type')) {
+    return { success: false, error: "Missing 'type' property" };
+  }
+
+  if (data.type !== 'challenge') {
+    return { success: false, error: `Invalid type: expected 'challenge', got '${data.type}'` };
+  }
+
+  if (!data.difficulty || data.difficulty < CHALLENGE_MIN_DIFFICULTY || data.difficulty > CHALLENGE_MAX_DIFFICULTY) {
+    return { success: false, error: `Difficulty must be between ${CHALLENGE_MIN_DIFFICULTY} and ${CHALLENGE_MAX_DIFFICULTY}` };
+  }
+
+  if (!data.name || data.name.length <= CHALLENGE_MIN_NAME_LENGTH || data.name.length >= CHALLENGE_MAX_NAME_LENGTH) {
+    return { success: false, error: `Name length must be between ${CHALLENGE_MIN_NAME_LENGTH + 1} and ${CHALLENGE_MAX_NAME_LENGTH - 1} characters` };
+  }
+
+  // Validation passed - enrich data
+  data.validatedAt = new Date().getTime();
+  data.isValid = true;
+
+  const score = (data.difficulty * DIFFICULTY_MULTIPLIER) + (data.name.length * NAME_LENGTH_MULTIPLIER);
+  data.complexityScore = score > COMPLEXITY_SCORE_THRESHOLD
+    ? score * COMPLEXITY_HIGH_MULTIPLIER
+    : score * COMPLEXITY_LOW_MULTIPLIER;
+
+  return { success: true, data };
 }
 
 // Constants for user validation
@@ -225,37 +228,53 @@ interface UserData {
   nameScore?: number;
 }
 
-export function processUserList(userList: UserData[]): (UserData | null | string)[] {
-  let results = [];
+// Return type for user processing
+type ProcessUserResult = {
+  processedUsers: UserData[];
+  validationCount: number;
+  errors: Array<{ index: number; error: string }>;
+};
+
+export function processUserList(userList: UserData[]): ProcessUserResult {
+  const processedUsers: UserData[] = [];
+  const errors: Array<{ index: number; error: string }> = [];
 
   for (let i = 0; i < userList.length; i++) {
-    let user = userList[i];
-    if (user != null) {
-      if (user.hasOwnProperty('name')) {
-        if (user.name.length > USER_MIN_NAME_LENGTH && user.name.length < USER_MAX_NAME_LENGTH) {
-          user.validatedAt = new Date().getTime();
-          user.isValid = true;
-          let score = user.name.length * USER_NAME_SCORE_MULTIPLIER;
-          if (score > USER_SCORE_THRESHOLD) {
-            user.nameScore = score * USER_HIGH_MULTIPLIER;
-          } else {
-            user.nameScore = score * USER_LOW_MULTIPLIER;
-          }
-          results.push(user);
-        } else {
-          throw new Error("User name length invalid");
-        }
-      } else {
-        results.push(null);
-      }
-    } else {
-      results.push("ERROR_NULL_USER");
+    const user = userList[i];
+
+    if (!user) {
+      errors.push({ index: i, error: "ERROR_NULL_USER" });
+      continue;
     }
+
+    if (!user.hasOwnProperty('name') || !user.name) {
+      errors.push({ index: i, error: "Missing name property" });
+      continue;
+    }
+
+    if (user.name.length <= USER_MIN_NAME_LENGTH || user.name.length >= USER_MAX_NAME_LENGTH) {
+      errors.push({ index: i, error: "User name length invalid" });
+      continue;
+    }
+
+    // Process valid user
+    const processedUser = { ...user };
+    processedUser.validatedAt = new Date().getTime();
+    processedUser.isValid = true;
+
+    const score = user.name.length * USER_NAME_SCORE_MULTIPLIER;
+    processedUser.nameScore = score > USER_SCORE_THRESHOLD
+      ? score * USER_HIGH_MULTIPLIER
+      : score * USER_LOW_MULTIPLIER;
+
+    processedUsers.push(processedUser);
   }
 
-  (global as any).LAST_VALIDATION_COUNT = results.length;
-
-  return results;
+  return {
+    processedUsers,
+    validationCount: processedUsers.length,
+    errors
+  };
 }
 
 // Constants for data processing
@@ -301,80 +320,127 @@ interface ProcessedUser extends UserData {
   timestamp?: string;
 }
 
-export function processAllData(challenges: ProcessedChallenge[], users: ProcessedUser[], settings: ProcessSettings): (ProcessedChallenge | ProcessedUser)[] {
-  // Processing function start
+// Return type for processing all data
+type ProcessAllDataResult = {
+  processedItems: (ProcessedChallenge | ProcessedUser)[];
+  totalProcessedItems: number;
+  lastProcessingTime: number;
+  challengesProcessed: number;
+  usersProcessed: number;
+};
 
-  let totalResults = [];
+/**
+ * Processes challenges and users according to business rules
+ * @param challenges Array of challenges to process
+ * @param users Array of users to process
+ * @param settings Processing configuration
+ * @returns Processing results with metadata
+ */
+export function processAllData(
+  challenges: ProcessedChallenge[],
+  users: ProcessedUser[],
+  settings: ProcessSettings
+): ProcessAllDataResult {
+  const processedItems: (ProcessedChallenge | ProcessedUser)[] = [];
+  const processingTime = Date.now();
+  let challengesProcessed = 0;
+  let usersProcessed = 0;
 
-  for (let i = 0; i < challenges.length; i++) {
-    let challenge = challenges[i];
-    if (challenge && challenge.id && challenge.name) {
-      if (challenge.difficulty >= 1 && challenge.difficulty <= 10) {
-        if (challenge.name.length > MIN_CHALLENGE_NAME_LENGTH) {
-          challenge.processed = true;
-          challenge.processedAt = Date.now();
+  // Process challenges
+  for (const challenge of challenges) {
+    if (!isValidChallenge(challenge)) continue;
 
-          if (challenge.difficulty > HARD_DIFFICULTY_THRESHOLD) {
-            challenge.category = "HARD";
-            challenge.multiplier = HARD_MULTIPLIER;
-          } else if (challenge.difficulty > MEDIUM_DIFFICULTY_THRESHOLD) {
-            challenge.category = "MEDIUM";
-            challenge.multiplier = MEDIUM_MULTIPLIER;
-          } else {
-            challenge.category = "EASY";
-            challenge.multiplier = EASY_MULTIPLIER;
-          }
+    const processedChallenge = { ...challenge };
+    processedChallenge.processed = true;
+    processedChallenge.processedAt = processingTime;
+    processedChallenge.category = getChallengeCategory(challenge.difficulty!);
+    processedChallenge.multiplier = getChallengeMultiplier(challenge.difficulty!);
 
-          totalResults.push(challenge);
-        }
-      }
-    }
+    processedItems.push(processedChallenge);
+    challengesProcessed++;
   }
 
-  for (let j = 0; j < users.length; j++) {
-    let user = users[j];
-    if (user && user.name && user.email) {
-      if (user.age > MIN_USER_AGE && user.age < MAX_USER_AGE) {
-        if (user.name.length > 1) {
-          user.processed = true;
-          user.processedAt = Date.now();
+  // Process users
+  for (const user of users) {
+    if (!isValidUser(user)) continue;
 
-          if (user.age > SENIOR_AGE_THRESHOLD) {
-            user.category = "SENIOR";
-            user.discount = SENIOR_DISCOUNT;
-          } else if (user.age > ADULT_AGE_THRESHOLD) {
-            user.category = "ADULT";
-            user.discount = ADULT_DISCOUNT;
-          } else {
-            user.category = "MINOR";
-            user.discount = MINOR_DISCOUNT;
-          }
+    const processedUser = { ...user };
+    processedUser.processed = true;
+    processedUser.processedAt = processingTime;
+    processedUser.category = getUserCategory(user.age!);
+    processedUser.discount = getUserDiscount(user.age!);
 
-          totalResults.push(user);
-        }
-      }
-    }
+    processedItems.push(processedUser);
+    usersProcessed++;
   }
 
-  if (settings) {
-    if (settings.enableFeatureX) {
-      for (let k = 0; k < totalResults.length; k++) {
-        totalResults[k].featureX = true;
-        totalResults[k].randomValue = Math.random();
-      }
-    }
-    if (settings.enableFeatureY) {
-      for (let l = 0; l < totalResults.length; l++) {
-        totalResults[l].featureY = true;
-        totalResults[l].timestamp = new Date().toISOString();
-      }
-    }
+  // Apply feature settings
+  applyFeatureSettings(processedItems, settings);
+
+  return {
+    processedItems,
+    totalProcessedItems: processedItems.length,
+    lastProcessingTime: processingTime,
+    challengesProcessed,
+    usersProcessed
+  };
+}
+
+// Helper functions for cleaner code
+function isValidChallenge(challenge: ProcessedChallenge): boolean {
+  return !!(challenge?.id && challenge?.name &&
+           challenge?.difficulty &&
+           challenge.difficulty >= 1 && challenge.difficulty <= 10 &&
+           challenge.name.length > MIN_CHALLENGE_NAME_LENGTH);
+}
+
+function isValidUser(user: ProcessedUser): boolean {
+  return !!(user?.name && user?.email && user?.age &&
+           user.age > MIN_USER_AGE && user.age < MAX_USER_AGE &&
+           user.name.length > 1);
+}
+
+function getChallengeCategory(difficulty: number): string {
+  if (difficulty > HARD_DIFFICULTY_THRESHOLD) return "HARD";
+  if (difficulty > MEDIUM_DIFFICULTY_THRESHOLD) return "MEDIUM";
+  return "EASY";
+}
+
+function getChallengeMultiplier(difficulty: number): number {
+  if (difficulty > HARD_DIFFICULTY_THRESHOLD) return HARD_MULTIPLIER;
+  if (difficulty > MEDIUM_DIFFICULTY_THRESHOLD) return MEDIUM_MULTIPLIER;
+  return EASY_MULTIPLIER;
+}
+
+function getUserCategory(age: number): string {
+  if (age > SENIOR_AGE_THRESHOLD) return "SENIOR";
+  if (age > ADULT_AGE_THRESHOLD) return "ADULT";
+  return "MINOR";
+}
+
+function getUserDiscount(age: number): number {
+  if (age > SENIOR_AGE_THRESHOLD) return SENIOR_DISCOUNT;
+  if (age > ADULT_AGE_THRESHOLD) return ADULT_DISCOUNT;
+  return MINOR_DISCOUNT;
+}
+
+function applyFeatureSettings(
+  items: (ProcessedChallenge | ProcessedUser)[],
+  settings: ProcessSettings
+): void {
+  if (!settings) return;
+
+  if (settings.enableFeatureX) {
+    items.forEach(item => {
+      item.featureX = true;
+      item.randomValue = Math.random();
+    });
   }
 
-  (global as any).TOTAL_PROCESSED_ITEMS = totalResults.length;
-  (global as any).LAST_PROCESSING_TIME = Date.now();
-
-  // Processing completed
-
-  return totalResults;
+  if (settings.enableFeatureY) {
+    items.forEach(item => {
+      item.featureY = true;
+      item.timestamp = new Date().toISOString();
+    });
+  }
 }
