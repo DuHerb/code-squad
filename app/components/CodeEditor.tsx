@@ -7,14 +7,14 @@ interface CodeEditorProps {
   onChange?: (value: string | undefined) => void;
 }
 
-export function CodeEditor({
+export const CodeEditor = React.memo(function CodeEditor({
   initialCode,
   language,
   onChange,
 }: Readonly<CodeEditorProps>) {
   return (
     <Editor
-      height='500px' // Default height, can be customized via props later
+      height='300px' // Default height, can be customized via props later
       defaultLanguage={language}
       defaultValue={initialCode}
       onChange={onChange}
@@ -25,4 +25,4 @@ export function CodeEditor({
       }}
     />
   );
-}
+});

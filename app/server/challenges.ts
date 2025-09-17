@@ -1,47 +1,64 @@
-export interface TestCase {
-  input: any[]; // Arguments to pass to the function
-  expectedOutput: any; // Expected return value
+import 'server-only';
+
+// Keep types needed for execution result
+export interface TestCaseResult {
+  input: any[];
+  output: any;
+  expected: any;
+  passed: boolean;
+  error?: string;
 }
 
-export interface Challenge {
-  id: string;
-  name: string;
-  description: string;
-  functionName: string; // The function the user needs to fix/implement
-  initialCode: string;
-  testCases: TestCase[];
-}
+export type ChallengeExecutionResult =
+  | {
+      success: true;
+      allPassed: boolean;
+      results: TestCaseResult[];
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
-// Simple in-memory store for challenges
-const challenges: Challenge[] = [
-  {
-    id: 'hello-world-typo',
-    name: 'Hello World Typo',
-    description: 'Fix the typo in the return statement.',
-    functionName: 'greet',
-    initialCode: `function greet(name) {\n  // Fix the typo!\n  retun \'Hello, \' + name + \'!';\n}`,
-    testCases: [
-      { input: ['World'], expectedOutput: 'Hello, World!' },
-      { input: ['Code Squad'], expectedOutput: 'Hello, Code Squad!' },
-    ],
-  },
-  {
-    id: 'simple-add',
-    name: 'Simple Addition',
-    description: 'Implement a function that adds two numbers.',
-    functionName: 'add',
-    initialCode: `function add(a, b) {\n  // Return the sum of a and b\n  return undefined; // Placeholder\n}`,
-    testCases: [
-      { input: [1, 2], expectedOutput: 3 },
-      { input: [10, -5], expectedOutput: 5 },
-      { input: [0, 0], expectedOutput: 0 },
-    ],
-  },
-  // Add more challenges here later
-];
+// --- Remove old types (Challenge, TestCase - moved to challenges.repository.ts) ---
+// export interface TestCase { ... }
+// export interface Challenge { ... }
 
-// Server function to get all challenge definitions (or maybe just IDs/names later)
-// For now, let's just get a specific challenge by ID
-export function getChallengeById(id: string): Challenge | undefined {
-  return challenges.find((c) => c.id === id);
+// --- Remove old data and data access functions ---
+// const challenges: Challenge[] = [ ... ];
+// export function getAllChallenges(): Challenge[] { ... }
+// export function getChallengeById(id: string): Challenge | undefined { ... }
+
+// Import service container for dependency injection
+import { serviceContainer } from './services/service-container';
+
+// --- Core Execution Handler (handleExecuteChallenge) ---
+/**
+ * Fetches a challenge by ID, validates it, and executes the provided user code against its test cases.
+ *
+ * Uses dependency-injected services to retrieve the challenge, perform validation, and run the execution.
+ *
+ * @returns A ChallengeExecutionResult containing either the per-test results and an allPassed flag (on success)
+ *          or an error string (on failure).
+ */
+
+export async function handleExecuteChallenge(data: {
+  challengeId: string;
+  userCode: string;
+}): Promise<ChallengeExecutionResult> {
+  const { challengeId, userCode } = data;
+
+  // Use dependency injection to get services
+  const challengeRepository = serviceContainer.challengeRepository;
+  const validationService = serviceContainer.validationService;
+  const challengeExecutionService = serviceContainer.challengeExecutionService;
+
+  // Get challenge from repository
+  const challenge = await challengeRepository.getChallengeById(challengeId);
+
+  // Validate challenge exists
+  const validatedChallenge = validationService.validateChallenge(challenge, challengeId);
+
+  // Execute challenge
+  return await challengeExecutionService.executeChallenge(validatedChallenge, userCode);
 }
