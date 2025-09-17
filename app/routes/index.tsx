@@ -92,7 +92,24 @@ export const Route = createFileRoute('/')({
   component: HomeComponent,
 });
 
-// Component definition
+/**
+ * UI for the home challenge page: displays the current challenge, provides a code editor,
+ * runs the user's code via a server function, and shows test results.
+ *
+ * This component reads challenge data from Route.useLoaderData(), manages local editor state,
+ * detects client rendering before mounting the full code editor, and resets editor state when
+ * the loaded challenge changes. When the user runs their code it calls the server function
+ * `executeCode` with the challenge ID and user code; if all tests pass it calls
+ * `markChallengeCompletedServerFn` and invalidates the route to refresh loader data.
+ *
+ * Side effects:
+ * - Calls `executeCode` to run tests on the server.
+ * - Calls `markChallengeCompletedServerFn` when a challenge is completed.
+ * - Calls `router.invalidate()` to refresh route loader data after marking completion.
+ *
+ * Returns a JSX element containing the challenge metadata, a code editor (client-only),
+ * a Run button, and a TestResults view when execution results are available.
+ */
 function HomeComponent() {
   const challenge = Route.useLoaderData();
   const router = useRouter(); // Get router instance

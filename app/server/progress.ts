@@ -23,7 +23,12 @@ import { serviceContainer } from './services/service-container';
 const CURRENT_USER_ID = 'user1';
 
 // --- Wrapper Functions for Server Actions ---
-// These now use the imported repository
+/**
+ * Clears stored progress for a specific user via the injected progress repository.
+ *
+ * @param data.userId - ID of the user whose progress should be removed.
+ * @returns An object with `success: true` and the `userId` on success; on failure returns `success: false` and an `error` message.
+ */
 
 export async function handleClearUserProgress(data: {
   userId: string;
@@ -44,6 +49,11 @@ export async function handleClearUserProgress(data: {
   }
 }
 
+/**
+ * Clears progress for all users by delegating to the configured progress repository.
+ *
+ * @returns An object with `success: true` when all progress was cleared, or `success: false` and an `error` message if the operation failed.
+ */
 export async function handleClearAllProgress(): Promise<{
   success: boolean;
   error?: string;

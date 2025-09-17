@@ -28,6 +28,13 @@ export const Route = createRootRoute({
   component: RootComponent,
 });
 
+/**
+ * Renders the root application layout: a document wrapper that includes a top navigation bar and an Outlet for nested routes.
+ *
+ * The navigation contains links to "/" ("Challenge") and "/progress" ("Progress Dashboard"); the active link is styled bold.
+ *
+ * @returns The React element tree for the root route.
+ */
 function RootComponent() {
   return (
     <RootDocument>
@@ -52,6 +59,15 @@ function RootComponent() {
   );
 }
 
+/**
+ * Renders the full HTML document shell for route pages.
+ *
+ * The component outputs a complete <html> element containing a <head> (populated via HeadContent)
+ * and a <body> that wraps the provided children and the router Scripts.
+ *
+ * @param children - The content to be rendered inside the document body.
+ * @returns The root HTML element for the page.
+ */
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html>

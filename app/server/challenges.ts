@@ -33,7 +33,14 @@ export type ChallengeExecutionResult =
 import { serviceContainer } from './services/service-container';
 
 // --- Core Execution Handler (handleExecuteChallenge) ---
-// Keep this function, but update it to use repositories
+/**
+ * Fetches a challenge by ID, validates it, and executes the provided user code against its test cases.
+ *
+ * Uses dependency-injected services to retrieve the challenge, perform validation, and run the execution.
+ *
+ * @returns A ChallengeExecutionResult containing either the per-test results and an allPassed flag (on success)
+ *          or an error string (on failure).
+ */
 
 export async function handleExecuteChallenge(data: {
   challengeId: string;

@@ -6,6 +6,13 @@ declare global {
   var __userProgressMap: Map<string, Set<string>> | undefined;
 }
 
+/**
+ * Returns the global in-memory user progress map, creating and attaching it to `globalThis.__userProgressMap` if it doesn't exist.
+ *
+ * The map keys are user IDs and values are Sets of completed challenge IDs.
+ *
+ * @returns The global Map<string, Set<string>> used to track completed challenges per user.
+ */
 function getProgressMap(): Map<string, Set<string>> {
   if (!globalThis.__userProgressMap) {
     console.log('[InMemoryProgressRepo] Initializing global progress map.');

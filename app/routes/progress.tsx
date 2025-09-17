@@ -59,6 +59,22 @@ export const Route = createFileRoute('/progress')({
   component: ProgressDashboard,
 });
 
+/**
+ * Renders the User Progress Dashboard and provides controls to inspect and manage server-side progress.
+ *
+ * Shows a card for each user from the route loader's `progressData` (via Route.useLoaderData()), listing completed challenge IDs.
+ * Exposes three user actions:
+ * - Log Server Progress: invokes a server action to log the server-side progress map and alerts the returned user count.
+ * - Clear All Progress: prompts for confirmation and invokes a server action to clear progress for all users; invalidates route data on success.
+ * - Clear This User's Progress: prompts for confirmation and invokes a server action to clear progress for the specified user; invalidates route data on success.
+ *
+ * Side effects:
+ * - Calls server functions (logProgressServer, clearAllProgressServer, clearUserProgressServer).
+ * - Shows browser confirmation dialogs and alert notifications.
+ * - Calls router.invalidate() to refresh loader data after successful mutations.
+ *
+ * @returns The dashboard component's JSX for rendering the progress UI.
+ */
 function ProgressDashboard() {
   const { progressData } = Route.useLoaderData();
   const router = useRouter(); // For invalidating data
