@@ -5,6 +5,16 @@ interface TestResultsProps {
   result: ChallengeExecutionResult;
 }
 
+/**
+ * Renders execution results for a challenge run, showing an overall status and per-test details.
+ *
+ * When `result.success` is false, displays the execution error. Otherwise shows an overall
+ * "PASSED"/"FAILED" status (based on `result.allPassed`) and a list of individual test case results.
+ *
+ * @param result - The challenge execution result to render (includes `success`, optional `error`,
+ *   `allPassed`, and an array of per-test `results`).
+ * @returns A React element containing the formatted execution summary and test-case list.
+ */
 export function TestResults({ result }: TestResultsProps) {
   if (!result.success) {
     return (
@@ -46,6 +56,17 @@ interface TestCaseResultProps {
   };
 }
 
+/**
+ * Renders a single test-case result as an <li> showing input, expected value, output, and status.
+ *
+ * Displays `input`, `expected`, and `output` using `JSON.stringify`. The status label and CSS class
+ * reflect the test outcome with this precedence: if `result.passed` is true the status is "Passed";
+ * otherwise if `result.error` is present the status is "Error: <error>" (class `test-status-error`);
+ * otherwise the status is "Failed" (class `test-status-failed`).
+ *
+ * @param result - The test case result object (contains `input`, `expected`, `output`, `passed`, and optional `error`).
+ * @returns A React list item element (<li>) representing the test case.
+ */
 function TestCaseResult({ result }: TestCaseResultProps) {
   return (
     <li>

@@ -1,7 +1,22 @@
 import { z } from 'zod';
 
 /**
- * Helper function to create server function handler with validation and error handling
+ * Creates a server-side handler wrapper that extracts and (optionally) validates input before invoking a business handler.
+ *
+ * The returned async function accepts a request context (`ctx`). If a Zod `schema` is provided the wrapper extracts raw input from, in order of availability:
+ * - `ctx.data`
+ * - `await ctx.request.json()` (if `ctx.request.json` is a function)
+ * - `ctx.input`
+ * - `ctx` (fallback)
+ *
+ * The raw input is validated with `schema.safeParse`. On validation failure an `Error` is thrown with message prefixed by "Invalid input: ". On success the parsed data is passed to `handler`.
+ *
+ * If no `schema` is provided the function uses `ctx.data` (or `{}`) cast to the input type and invokes `handler` directly.
+ *
+ * @param options.schema - Optional Zod schema used to validate and parse the incoming input.
+ * @param options.handler - Function that performs the actual handling logic; receives the validated (or raw when no schema) input and may return a value or a promise.
+ * @returns An async function that takes a request context (`ctx`) and returns the result of `handler`.
+ * @throws Error When input validation fails (message starts with "Invalid input: ").
  */
 export function createServerHandler<TInput, TOutput>(options: {
   schema?: z.ZodSchema<TInput>;
