@@ -1,3 +1,5 @@
+import 'server-only';
+
 // Remove File I/O and old core logic functions
 // Keep ONLY the wrapper handler functions and CURRENT_USER_ID
 
@@ -14,8 +16,8 @@
 // export async function clearAllProgress() { ... }
 // export async function clearProgressByUser(userId: string) { ... }
 
-// Import the repository
-import { progressRepository } from './repositories/progress.repository';
+// Import service container for dependency injection
+import { serviceContainer } from './services/service-container';
 
 // Hardcoded user ID remains for convenience functions used by wrappers
 const CURRENT_USER_ID = 'user1';
@@ -30,8 +32,8 @@ export async function handleClearUserProgress(data: {
     if (typeof data?.userId !== 'string') {
       throw new Error('Invalid input: userId must be a string.');
     }
-    // Use repository method
-    await progressRepository.clearProgressByUser(data.userId);
+    // Use repository method via service container
+    await serviceContainer.progressRepository.clearProgressByUser(data.userId);
     return { success: true, userId: data.userId };
   } catch (error: any) {
     console.error('[handleClearUserProgress] Error:', error);
@@ -47,8 +49,8 @@ export async function handleClearAllProgress(): Promise<{
   error?: string;
 }> {
   try {
-    // Use repository method
-    await progressRepository.clearAllProgress();
+    // Use repository method via service container
+    await serviceContainer.progressRepository.clearAllProgress();
     return { success: true };
   } catch (error: any) {
     console.error('[handleClearAllProgress] Error:', error);

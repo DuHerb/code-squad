@@ -7,7 +7,7 @@ interface CodeEditorProps {
   onChange?: (value: string | undefined) => void;
 }
 
-export function CodeEditor({
+export const CodeEditor = React.memo(function CodeEditor({
   initialCode,
   language,
   onChange,
@@ -25,4 +25,4 @@ export function CodeEditor({
       }}
     />
   );
-}
+});

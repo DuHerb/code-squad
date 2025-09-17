@@ -1,36 +1,48 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
-import { createServerFn } from '@tanstack/react-start';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CodeEditor } from '../components/CodeEditor';
-import {
-  handleExecuteChallenge,
-  type ChallengeExecutionResult,
-} from '../server/challenges';
-import { challengeRepository } from '../server/repositories/challenges.repository';
-import { progressRepository } from '../server/repositories/progress.repository';
+import { TestResults } from '../components/TestResults';
+import { Button } from '../components/Button';
+import type { ChallengeExecutionResult } from '../server/challenges';
 import {
   markChallengeCompletedServerFn,
   getCompletedChallengesServerFn,
 } from '../server/progress.server';
+import { createServerFn } from '@tanstack/react-start';
+import { createServerHandler, ChallengeExecutionSchema } from '../server/utils/server-function';
 
 // Simplified server function - Calls the core logic handler
-const executeCode = createServerFn({ method: 'POST' })
-  // Keep handler simple, calling the dedicated logic function
-  .handler(async (ctx) => {
-    // @ts-expect-error - Acknowledging ctx.data type mismatch from createServerFn
-    return await handleExecuteChallenge(ctx.data);
-  });
+const executeCode = createServerFn({
+  method: 'POST',
+}).handler(createServerHandler({
+  schema: ChallengeExecutionSchema,
+  handler: async (data) => {
+    const { handleExecuteChallenge } = await import('../server/challenges');
+    return handleExecuteChallenge(data);
+  },
+}));
+
+// Simple cache for challenges (in production, use a more sophisticated cache)
+let challengeCache: any[] | null = null;
 
 // Route definition with Loader
 export const Route = createFileRoute('/')({
   loader: async () => {
     console.log('Loader: Finding next challenge for user1 via ServerFn...');
-    const allChallenges = await challengeRepository.getAllChallenges();
+
+    // Use cached challenges if available
+    if (!challengeCache) {
+      const { serviceContainer } = await import('../server/services/service-container');
+      challengeCache = await serviceContainer.challengeRepository.getAllChallenges();
+      console.log('Challenges loaded and cached');
+    } else {
+      console.log('Using cached challenges');
+    }
+    const allChallenges = challengeCache;
 
     // Call server function with no arguments
     let completedArray: string[] = [];
     try {
-      // No argument needed, no suppression needed
       completedArray = await getCompletedChallengesServerFn();
     } catch (error) {
       console.error('Error fetching completed challenges:', error);
@@ -105,17 +117,16 @@ function HomeComponent() {
     setExecutionResult(null);
   }, [challenge.id, challenge.initialCode]);
 
-  const handleCodeChange = (value: string | undefined) => {
+  const handleCodeChange = useCallback((value: string | undefined) => {
     setCode(value ?? '');
-  };
+  }, []);
 
-  const handleRunCode = async () => {
+  const handleRunCode = useCallback(async () => {
     setIsLoading(true);
     setExecutionResult(null);
     try {
       // 1. Execute the code via server function
       const result = await executeCode({
-        // @ts-ignore - Ignoring persistent type mismatch
         data: { challengeId: challenge.id, userCode: code },
       });
 
@@ -125,10 +136,9 @@ function HomeComponent() {
       if (result.success && result.allPassed) {
         console.log('Challenge passed! Marking complete and invalidating...');
         try {
-          await markChallengeCompletedServerFn(
-            // @ts-expect-error - Known type issue calling serverFn from client
-            { data: { userId: 'user1', challengeId: challenge.id } }
-          );
+          await markChallengeCompletedServerFn({
+            data: { userId: 'user1', challengeId: challenge.id }
+          });
           console.log('Marked complete via server fn call from client.');
 
           await router.invalidate();
@@ -146,7 +156,7 @@ function HomeComponent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [challenge.id, code, router]);
 
   // JSX for the component
   return (
@@ -190,81 +200,15 @@ function HomeComponent() {
         </div>
       )}
 
-      {/* Apply button style */}
-      <button
-        className='button-run' // Add class
+      <Button
+        variant="run"
         onClick={handleRunCode}
         disabled={isLoading || challenge.allComplete || !isClient}
-        // style={{ marginTop: '10px' }} // Remove inline style
       >
         {isLoading ? 'Running...' : 'Run Test Cases'}
-      </button>
+      </Button>
 
-      {executionResult && (
-        // Add base class and dynamic class for border color
-        <div
-          className={`results-container ${
-            !executionResult.success
-              ? 'results-fail'
-              : executionResult.allPassed
-                ? 'results-success'
-                : 'results-partial'
-          }`}
-          // style={...} // Remove inline style for border
-        >
-          <h3>Execution Result:</h3>
-          {!executionResult.success ? (
-            // Add class for error text
-            <pre className='test-status-error'>
-              Error: {executionResult.error}
-            </pre>
-          ) : (
-            <div>
-              {/* Add classes for overall status */}
-              <h4
-                className={
-                  executionResult.allPassed
-                    ? 'test-status-passed'
-                    : 'test-status-failed'
-                }
-                // style={...} // Remove inline style
-              >
-                Overall: {executionResult.allPassed ? 'PASSED' : 'FAILED'}
-              </h4>
-              <ul>
-                {executionResult.results.map((res, index) => (
-                  // Apply dynamic class based on test status
-                  <li
-                    key={index}
-                    // style={...} // Remove inline styles
-                  >
-                    Input: {JSON.stringify(res.input)} <br />
-                    Expected: {JSON.stringify(res.expected)} <br />
-                    Output: {JSON.stringify(res.output)} <br />
-                    {/* Apply dynamic class for status text */}
-                    <span
-                      className={
-                        res.passed
-                          ? 'test-status-passed'
-                          : res.error
-                            ? 'test-status-error'
-                            : 'test-status-failed'
-                      }
-                    >
-                      Status:{' '}
-                      {res.passed
-                        ? 'Passed'
-                        : res.error
-                          ? `Error: ${res.error}`
-                          : 'Failed'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+      {executionResult && <TestResults result={executionResult} />}
     </div>
   );
 }

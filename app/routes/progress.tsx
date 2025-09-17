@@ -1,39 +1,40 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
-import { createServerFn } from '@tanstack/react-start';
 import {
   handleClearUserProgress,
   handleClearAllProgress,
 } from '../server/progress';
 import { getAllProgressServerFn } from '../server/progress.server';
-import { progressRepository } from '../server/repositories/progress.repository';
+import { createServerFn } from '@tanstack/react-start';
+import { createServerHandler, UserSchema } from '../server/utils/server-function';
+import { Button } from '../components/Button';
 
 // Server function to clear a specific user's progress
-const clearUserProgressServer = createServerFn({ method: 'POST' })
-  // Let type inference work, call dedicated handler
-  .handler(async (ctx) => {
-    // @ts-expect-error - Still might need suppressor for data access
-    return await handleClearUserProgress(ctx.data);
-  });
+const clearUserProgressServer = createServerFn({
+  method: 'POST',
+}).handler(createServerHandler({
+  schema: UserSchema,
+  handler: handleClearUserProgress,
+}));
 
 // Server function to clear all progress - Now simplified
-const clearAllProgressServer = createServerFn({ method: 'POST' })
-  // Let type inference work, call dedicated handler
-  .handler(async (ctx) => {
-    // ctx is unused now
-    // Remove unused suppressor below
-    return await handleClearAllProgress();
-  });
+const clearAllProgressServer = createServerFn({
+  method: 'POST',
+}).handler(createServerHandler({
+  handler: handleClearAllProgress,
+}));
 
 // Server Function to Log Progress
-const logProgressServer = createServerFn({ method: 'POST' }).handler(
-  async () => {
+const logProgressServer = createServerFn({
+  method: 'POST',
+}).handler(createServerHandler({
+  handler: async () => {
     console.log('[Manual Log Button] Logging current server progress...');
-    // Use repository directly (safe now)
-    const progressMap = await progressRepository.getAllProgress();
+    const { serviceContainer } = await import('../server/services/service-container');
+    const progressMap = await serviceContainer.progressRepository.getAllProgress();
     console.log('[Manual Log Button] Current progressMap:', progressMap);
     return { success: true, userCount: progressMap.size };
-  }
-);
+  },
+}));
 
 export const Route = createFileRoute('/progress')({
   loader: async () => {
@@ -72,8 +73,6 @@ function ProgressDashboard() {
       confirm(`Are you sure you want to clear progress for user ${userId}?`)
     ) {
       try {
-        // Keep suppressor on client call
-        // @ts-expect-error - Acknowledging call signature mismatch
         await clearUserProgressServer({ data: { userId } });
         router.invalidate();
       } catch (error) {
@@ -86,8 +85,6 @@ function ProgressDashboard() {
   const handleClearAll = async () => {
     if (confirm('Are you sure you want to clear ALL user progress?')) {
       try {
-        // Keep suppressor on client call
-        // @ts-expect-error - Acknowledging call signature mismatch
         await clearAllProgressServer({ data: {} });
         router.invalidate();
       } catch (error) {
@@ -101,8 +98,7 @@ function ProgressDashboard() {
   const handleLogProgress = async () => {
     try {
       console.log('Sending request to log server progress...');
-      // @ts-ignore - Ignoring potential type mismatch for call
-      const result = await logProgressServer({ data: {} }); // Send empty data for POST
+      const result = await logProgressServer({ data: {} });
       console.log('Server log response:', result);
       alert(`Server progress logged. User count: ${result.userCount}`);
     } catch (error) {
@@ -114,12 +110,12 @@ function ProgressDashboard() {
   return (
     <div className='container'>
       <h1>User Progress Dashboard</h1>
-      <button className='button-log' onClick={handleLogProgress}>
+      <Button variant="log" onClick={handleLogProgress}>
         Log Server Progress Map (Console)
-      </button>
-      <button className='button-clear' onClick={handleClearAll}>
+      </Button>
+      <Button variant="clear" onClick={handleClearAll}>
         Clear All Progress
-      </button>
+      </Button>
       <div className='progress-dashboard'>
         {progressData.length === 0 && <p>No user progress recorded yet.</p>}
         {progressData.map(({ userId, completedChallenges }) => (
@@ -135,12 +131,12 @@ function ProgressDashboard() {
             ) : (
               <p>None</p>
             )}
-            <button
-              className='button-clear-user'
+            <Button
+              variant="clear-user"
               onClick={() => handleClearUser(userId)}
             >
               Clear This User's Progress
-            </button>
+            </Button>
           </div>
         ))}
       </div>
